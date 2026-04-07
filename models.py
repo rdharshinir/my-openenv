@@ -16,7 +16,7 @@ from openenv.core.env_server.types import Action, Observation
 from pydantic import Field
 
 
-class MyAction(Action):
+class PathosAction(Action):
     """Action for the GridMind environment.
 
     The ``message`` field accepts either:
@@ -27,7 +27,7 @@ class MyAction(Action):
     message: str = Field(..., description="Action as digit (0-3) or natural language direction")
 
 
-class MyObservation(Observation):
+class PathosObservation(Observation):
     """Rich observation from the GridMind environment.
 
     Provides both a human-readable ASCII grid and a machine-readable

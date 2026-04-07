@@ -58,24 +58,21 @@ def _generate_maze(size: int, rng: random.Random) -> list[list[bool]]:
 
 class GridEnv:
     """
-    A grid-world environment with:
-      - Randomized goal position each reset
-      - Increasing grid size tied to episode count
-      - Multiple map types: open, sparse, maze, adversarial
-      - Seeded randomness for reproducibility
-      - Configurable step penalty
-      - ASCII visualization via render()
-      - Rich structured observation via structured_obs()
+    Pathos AI Drone Rescue Simulator:
+      - Navigate as an autonomous drone 🚁
+      - Rescue stranded survivors 🆘 before reaching extraction 🏥
+      - Avoid static hazards ☣️ and active spreading fires 🔥
+      - Evaluates spatial mapping and risk mitigation in LLMs
 
     Actions: 0=up, 1=down, 2=left, 3=right
     """
 
     # ── Reward shaping knobs ──
-    STEP_PENALTY   = -0.1    # small cost per step
-    TRAP_PENALTY   = -10.0   # hitting a trap / wall
-    GOAL_REWARD    = +10.0   # reaching the goal
-    KEY_REWARD     = +3.0    # picking up a key
-    MAX_STEPS      = None    # set to an int to cap episodes (None = unlimited)
+    STEP_PENALTY   = -0.1    # battery drain per step
+    TRAP_PENALTY   = -10.0   # flying into a hazard/fire (fatal)
+    GOAL_REWARD    = +10.0   # reaching extraction safety
+    KEY_REWARD     = +5.0    # rescuing a survivor
+    MAX_STEPS      = None    # maximum safe flight time
 
     def __init__(
         self,
@@ -201,19 +198,20 @@ class GridEnv:
 
     def render(self) -> str:
         """
-        Return an ASCII representation of the current grid.
+        Return a beautiful Emoji representation of the disaster zone.
 
         Legend:
-            A  – agent
-            G  – goal
-            T  – trap (static)
-            M  – moving trap (adversarial)
-            K  – key
-            #  – wall
-            .  – empty cell
+            🚁 – Drone (Agent)
+            🏥 – Extraction (Goal)
+            ☣️ – Static Hazard (Trap)
+            🔥 – Spreading Fire (Moving Trap)
+            🆘 – Survivor (Key)
+            🧱 – Debris (Wall)
+            ⬜ – Clear path
         """
         lines = []
-        border = "+" + "---+" * self.size
+        # Adjusted border for double-wide emojis
+        border = "+" + "----+" * self.size
         lines.append(border)
 
         for r in range(self.size):
@@ -221,19 +219,19 @@ class GridEnv:
             for c in range(self.size):
                 cell = [r, c]
                 if self._walls and self._walls[r][c]:
-                    row += " # |"
+                    row += " 🧱 |"
                 elif cell == self.agent:
-                    row += " A |"
+                    row += " 🚁 |"
                 elif cell == self.goal:
-                    row += " G |"
+                    row += " 🏥 |"
                 elif cell in self.moving_traps:
-                    row += " M |"
+                    row += " 🔥 |"
                 elif cell in self.traps:
-                    row += " T |"
+                    row += " ☣️ |"
                 elif cell in self.keys:
-                    row += " K |"
+                    row += " 🆘 |"
                 else:
-                    row += " . |"
+                    row += " ⬜ |"
             lines.append(row)
             lines.append(border)
 
@@ -241,9 +239,9 @@ class GridEnv:
         goal_pos = tuple(self.goal)
         dist = abs(self.agent[0] - self.goal[0]) + abs(self.agent[1] - self.goal[1])
         lines.append(
-            f"Step: {self.steps}  |  Size: {self.size}×{self.size}  "
-            f"|  Map: {self.map_type}  |  Agent: {agent_pos}  "
-            f"|  Goal: {goal_pos}  |  Dist: {dist}"
+            f"Battery Steps: {self.steps}  |  Zone Size: {self.size}×{self.size}  "
+            f"|  Map: {self.map_type}  |  Drone: {agent_pos}  "
+            f"|  Extraction: {goal_pos}  |  Dist: {dist}"
         )
         return "\n".join(lines)
 
@@ -276,25 +274,25 @@ class GridEnv:
                     })
 
         return {
-            "agent": list(self.agent),
-            "goal": list(self.goal),
-            "traps": [list(t) for t in self.traps],
-            "moving_traps": [list(t) for t in self.moving_traps],
-            "keys_remaining": [list(k) for k in self.keys],
-            "keys_collected": self.keys_collected,
-            "grid_size": self.size,
-            "map_type": self.map_type,
-            "steps_taken": self.steps,
-            "manhattan_dist_to_goal": manhattan_dist,
-            "direction_to_goal": direction_hint,
+            "drone_position": list(self.agent),
+            "extraction_zone": list(self.goal),
+            "static_hazards": [list(t) for t in self.traps],
+            "active_fires": [list(t) for t in self.moving_traps],
+            "survivors_to_rescue": [list(k) for k in self.keys],
+            "survivors_rescued": self.keys_collected,
+            "zone_size": self.size,
+            "disaster_type": self.map_type,
+            "battery_used": self.steps,
+            "manhattan_dist_to_extraction": manhattan_dist,
+            "direction_to_extraction": direction_hint,
             "nearby_danger": len(nearby_traps) > 0,
-            "nearby_traps": nearby_traps,
-            "valid_actions": valid_actions,
+            "nearby_hazards_coords": nearby_traps,
+            "valid_flight_paths": valid_actions,
             "rewards": {
-                "step_penalty": self.STEP_PENALTY,
-                "trap_penalty": self.TRAP_PENALTY,
-                "goal_reward": self.GOAL_REWARD,
-                "key_reward": self.KEY_REWARD,
+                "battery_drain": self.STEP_PENALTY,
+                "hazard_penalty": self.TRAP_PENALTY,
+                "extraction_reward": self.GOAL_REWARD,
+                "survivor_reward": self.KEY_REWARD,
             },
         }
 

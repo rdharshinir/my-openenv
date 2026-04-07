@@ -23,16 +23,16 @@ from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
 try:
-    from ..models import MyAction, MyObservation
+    from ..models import PathosAction, PathosObservation
     from ..env import GridEnv
 except ImportError:
-    from models import MyAction, MyObservation
+    from models import PathosAction, PathosObservation
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     from env import GridEnv
 
 
-class MyEnvironment(Environment):
+class PathosEnvironment(Environment):
     """
     Grid-world environment with randomized goals, increasing difficulty,
     step-penalty tuning, and structure observations.
@@ -47,7 +47,7 @@ class MyEnvironment(Environment):
 
     # ── OpenEnv interface ──────────────────────────────────────────────────
 
-    def reset(self, seed: int = None) -> MyObservation:
+    def reset(self, seed: int = None) -> PathosObservation:
         """Reset the grid, advance difficulty, return rich observation."""
         self._episode_count += 1
         
@@ -59,7 +59,7 @@ class MyEnvironment(Environment):
         rendered_grid = self._grid.render()
         structured_obs = self._grid.structured_obs()
 
-        return MyObservation(
+        return PathosObservation(
             grid_state=rendered_grid,
             echoed_message=rendered_grid, # Backwards compat
             structured=structured_obs,
@@ -74,7 +74,7 @@ class MyEnvironment(Environment):
             metadata=self._meta(result="reset", structured=structured_obs),
         )
 
-    def step(self, action: MyAction) -> MyObservation:  # type: ignore[override]
+    def step(self, action: PathosAction) -> PathosObservation:  # type: ignore[override]
         """
         Execute one grid step.
         Supports natural language parsing for basic directions or digits.
@@ -104,7 +104,7 @@ class MyEnvironment(Environment):
         rendered_grid = self._grid.render()
         structured_obs = self._grid.structured_obs()
 
-        return MyObservation(
+        return PathosObservation(
             grid_state=rendered_grid,
             echoed_message=rendered_grid,
             structured=structured_obs,

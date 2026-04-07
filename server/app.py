@@ -24,18 +24,18 @@ except Exception as e:  # pragma: no cover
     ) from e
 
 try:
-    from ..models import MyAction, MyObservation
-    from .my_env_environment import MyEnvironment
+    from ..models import PathosAction, PathosObservation
+    from .my_env_environment import PathosEnvironment
 except ImportError:
-    from models import MyAction, MyObservation
-    from server.my_env_environment import MyEnvironment
+    from models import PathosAction, PathosObservation
+    from server.my_env_environment import PathosEnvironment
 
 
 # Create the app with web interface and README integration
 app = create_app(
-    MyEnvironment,
-    MyAction,
-    MyObservation,
+    PathosEnvironment,
+    PathosAction,
+    PathosObservation,
     env_name="gridmind",
     max_concurrent_envs=10,  # Increased for multi-agent or concurrent demo usage
 )

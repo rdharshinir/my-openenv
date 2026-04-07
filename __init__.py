@@ -6,11 +6,11 @@
 
 """My Env Environment."""
 
-from .client import MyEnv
-from .models import MyAction, MyObservation
+from .client import PathosEnv
+from .models import PathosAction, PathosObservation
 
 __all__ = [
-    "MyAction",
-    "MyObservation",
-    "MyEnv",
+    "PathosAction",
+    "PathosObservation",
+    "PathosEnv",
 ]

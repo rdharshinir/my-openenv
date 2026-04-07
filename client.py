@@ -13,16 +13,16 @@ from openenv.core.client_types import StepResult
 from openenv.core.env_server.types import State
 
 try:
-    from .models import MyAction, MyObservation
+    from .models import PathosAction, PathosObservation
 except ImportError:
-    from models import MyAction, MyObservation
+    from models import PathosAction, PathosObservation
 
 
-class MyEnv(
-    EnvClient[MyAction, MyObservation, State]
+class PathosEnv(
+    EnvClient[PathosAction, PathosObservation, State]
 ):
     """
-    Client for the My Env Environment.
+    Client for the Pathos AI Environment.
 
     This client maintains a persistent WebSocket connection to the environment server,
     enabling efficient multi-step interactions with lower latency.
@@ -30,29 +30,29 @@ class MyEnv(
 
     Example:
         >>> # Connect to a running server
-        >>> with MyEnv(base_url="http://localhost:8000") as client:
+        >>> with PathosEnv(base_url="http://localhost:8000") as client:
         ...     result = client.reset()
         ...     print(result.observation.echoed_message)
         ...
-        ...     result = client.step(MyAction(message="Hello!"))
+        ...     result = client.step(PathosAction(message="Hello!"))
         ...     print(result.observation.echoed_message)
 
     Example with Docker:
         >>> # Automatically start container and connect
-        >>> client = MyEnv.from_docker_image("my_env-env:latest")
+        >>> client = PathosEnv.from_docker_image("my_env-env:latest")
         >>> try:
         ...     result = client.reset()
-        ...     result = client.step(MyAction(message="Test"))
+        ...     result = client.step(PathosAction(message="Test"))
         ... finally:
         ...     client.close()
     """
 
-    def _step_payload(self, action: MyAction) -> Dict:
+    def _step_payload(self, action: PathosAction) -> Dict:
         """
-        Convert MyAction to JSON payload for step message.
+        Convert PathosAction to JSON payload for step message.
 
         Args:
-            action: MyAction instance
+            action: PathosAction instance
 
         Returns:
             Dictionary representation suitable for JSON encoding
@@ -61,18 +61,18 @@ class MyEnv(
             "message": action.message,
         }
 
-    def _parse_result(self, payload: Dict) -> StepResult[MyObservation]:
+    def _parse_result(self, payload: Dict) -> StepResult[PathosObservation]:
         """
-        Parse server response into StepResult[MyObservation].
+        Parse server response into StepResult[PathosObservation].
 
         Args:
             payload: JSON response data from server
 
         Returns:
-            StepResult with MyObservation
+            StepResult with PathosObservation
         """
         obs_data = payload.get("observation", {})
-        observation = MyObservation(
+        observation = PathosObservation(
             grid_state=obs_data.get("grid_state", ""),
             echoed_message=obs_data.get("echoed_message", ""),
             structured=obs_data.get("structured", {}),

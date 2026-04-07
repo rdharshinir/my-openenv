@@ -11,7 +11,7 @@ import time
 
 # Deferred openai import for when a real API is used
 
-from client import MyEnv, MyAction
+from client import PathosEnv, PathosAction
 
 
 # Fallback test mock API client if api key is not set
@@ -52,8 +52,8 @@ else:
     print("WARNING: Using mock logic. Set LLAMA_API_KEY environment variable to use real Llama models.")
     client = MockLlamaClient()
 
-SYSTEM_PROMPT = """You are a smart agent navigating a grid-world.
-You must reach the goal while avoiding traps and walls.
+SYSTEM_PROMPT = """You are a Pathos Rescue Drone navigating a disaster zone.
+You must reach the extraction zone while avoiding hazards and moving fires.
 Your output must be EXCLUSIVELY a JSON object with two keys:
 1. 'reasoning': A short explanation of your logic (max 2 sentences).
 2. 'action': Your chosen action. MUST be one of: 'up', 'down', 'left', 'right'.
@@ -61,7 +61,7 @@ Your output must be EXCLUSIVELY a JSON object with two keys:
 
 def play_episode():
     # Connect to local environment server (make sure `uvicorn server.app:app` is running)
-    with MyEnv(base_url="http://localhost:8000").sync() as env:
+    with PathosEnv(base_url="http://localhost:8000").sync() as env:
         print("Starting Llama Agent Demo...")
         # Reset and get initial structured observation
         result = env.reset()
@@ -72,17 +72,17 @@ def play_episode():
             # Format the state cleanly for the LLM
             prompt = f"""
 Current State:
-- Grid Size: {obs['grid_size']}x{obs['grid_size']}
-- Map Type: {obs['map_type']}
-- Agent Position: {obs['agent']}
-- Goal Position: {obs['goal']}
-- Distance to goal: {obs['manhattan_dist_to_goal']}
-- Direction to goal: {obs['direction_to_goal']}
+- Zone Size: {obs['zone_size']}x{obs['zone_size']}
+- Disaster Type: {obs['disaster_type']}
+- Drone Position: {obs['drone_position']}
+- Extraction Zone: {obs['extraction_zone']}
+- Distance to extraction: {obs['manhattan_dist_to_extraction']}
+- Direction to extraction: {obs['direction_to_extraction']}
 
-Valid Actions (those not immediately resulting in a wall bump):
+Valid Flight Paths (those not immediately resulting in a crash):
 """
-            for a in obs['valid_actions']:
-                 prompt += f" - {a['label']} -> moves to {a['leads_to']}\n"
+            for a in obs['valid_flight_paths']:
+                 prompt += f" - {a['label']} -> flies to {a['leads_to']}\n"
                  
             try:
                 response = client.chat.completions.create(
@@ -106,7 +106,7 @@ Valid Actions (those not immediately resulting in a wall bump):
                 print(f"🧐 CoT: {reasoning}")
                 print(f"🤖 Action: {action_str} -> Map Update:")
                 
-                result = env.step(MyAction(message=action_str))
+                result = env.step(PathosAction(message=action_str))
                 print(result.observation.grid_state)
                 time.sleep(0.5)
                 
@@ -114,16 +114,16 @@ Valid Actions (those not immediately resulting in a wall bump):
                 print(f"Agent error or JSON parse failure: {e}")
                 # Fallback to safe valid action
                 safe_act = "up"
-                if obs['valid_actions']:
-                    safe_act = obs['valid_actions'][0]['label']
-                result = env.step(MyAction(message=safe_act))
+                if obs['valid_flight_paths']:
+                    safe_act = obs['valid_flight_paths'][0]['label']
+                result = env.step(PathosAction(message=safe_act))
         
         print("\n=== Episode Finished ===")
         print(f"Reward: {result.reward}")
         if result.reward >= 10.0:
-            print("🎉 Success! Goal reached!")
+            print("🎉 Success! Reached Extraction Zone!")
         else:
-            print("💀 Failure! Agent hit a trap.")
+            print("💀 Failure! Drone was destroyed in a hazard.")
             
 if __name__ == "__main__":
     play_episode()
