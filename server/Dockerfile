@@ -74,9 +74,9 @@ ENV PYTHONPATH="/app:$PYTHONPATH"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:7860/health || exit 1
 
 # Run the FastAPI server using the fully-qualified module path.
 # With PYTHONPATH=/app and code at /app/env, the package is `env.server.app`.
 # We rename the working dir so the folder is treated as package `my_env`.
-CMD ["sh", "-c", "ln -sfn /app/env /app/my_env && uvicorn my_env.server.app:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "ln -sfn /app/env /app/my_env && uvicorn my_env.server.app:app --host 0.0.0.0 --port 7860"]
