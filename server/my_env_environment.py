@@ -1,24 +1,8 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """
-GridMind – Grid-World Environment Implementation.
-
-A grid-world RL environment exposed over HTTP/WebSocket via OpenEnv.
-
-Features
---------
-- Randomized goal position every episode
-- Increasing grid size based on episode count
-- Multiple map types (maze, sparse, adversarial)
-- Rich structured observation for LLM agents
+Pathos AI – GridMind Environment Implementation (OpenEnv server wrapper).
 """
 
 from uuid import uuid4
-
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
@@ -34,8 +18,12 @@ except ImportError:
 
 class PathosEnvironment(Environment):
     """
-    Grid-world environment with randomized goals, increasing difficulty,
-    step-penalty tuning, and structure observations.
+    Grid-world environment with:
+    - 4 curriculum difficulty levels
+    - Wind zones, fog of war, dynamic hazards
+    - Tiered objectives (extraction, survivors, speed bonus)
+    - Replay trajectory recording
+    - Scenario editor support (custom layouts)
     """
 
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
@@ -47,76 +35,89 @@ class PathosEnvironment(Environment):
 
     # ── OpenEnv interface ──────────────────────────────────────────────────
 
-    def reset(self, seed: int = None) -> PathosObservation:
-        """Reset the grid, advance difficulty, return rich observation."""
+    def reset(
+        self,
+        seed: int = None,
+        difficulty: int = None,
+        custom_layout: dict = None,
+    ) -> PathosObservation:
+        """Reset with optional curriculum difficulty or custom scenario layout."""
         self._episode_count += 1
-        
-        # Advance difficulty and optionally use a specific seed
-        self._grid.reset(advance_difficulty=True, seed=seed)
-
+        self._grid.reset(
+            advance_difficulty=(difficulty is None and custom_layout is None),
+            seed=seed,
+            difficulty=difficulty,
+            custom_layout=custom_layout,
+        )
         self._state = State(episode_id=str(uuid4()), step_count=0)
 
-        rendered_grid = self._grid.render()
-        structured_obs = self._grid.structured_obs()
+        rendered = self._grid.render()
+        structured = self._grid.structured_obs()
+        grid_ui = self._grid.get_grid_for_ui()
 
         return PathosObservation(
-            grid_state=rendered_grid,
-            echoed_message=rendered_grid, # Backwards compat
-            structured=structured_obs,
+            grid_state=rendered,
+            echoed_message=rendered,
+            structured=structured,
+            grid_ui=grid_ui,
             message_length=0,
             step_count=0,
+            reward=0.0,
+            done=False,
             map_type=self._grid.map_type,
             grid_size=self._grid.size,
             episode_seed=self._grid.seed,
+            difficulty_level=self._grid.difficulty_level,
+            difficulty_label=self._grid.difficulty_label,
             keys_collected=self._grid.keys_collected,
-            done=False,
-            reward=0.0,
-            metadata=self._meta(result="reset", structured=structured_obs),
+            objectives=dict(self._grid.objectives),
+            trajectory=[],
+            metadata=self._meta(result="reset", structured=structured),
         )
 
-    def step(self, action: PathosAction) -> PathosObservation:  # type: ignore[override]
-        """
-        Execute one grid step.
-        Supports natural language parsing for basic directions or digits.
-        """
+    def step(self, action: PathosAction) -> PathosObservation:
+        """Execute one grid step with natural language or digit action."""
         self._state.step_count += 1
-
         msg = action.message.strip().lower()
 
-        # Simple naive natural language to action parsing
         act_int = -1
-        if msg in ("0", "up", "north"): act_int = 0
-        elif msg in ("1", "down", "south"): act_int = 1
-        elif msg in ("2", "left", "west"): act_int = 2
-        elif msg in ("3", "right", "east"): act_int = 3
+        if   msg in ("0", "up",    "north"): act_int = 0
+        elif msg in ("1", "down",  "south"): act_int = 1
+        elif msg in ("2", "left",  "west"):  act_int = 2
+        elif msg in ("3", "right", "east"):  act_int = 3
         else:
-            # Fallback parsing just in case it contains keywords
-            if "up" in msg or "north" in msg: act_int = 0
-            elif "down" in msg or "south" in msg: act_int = 1
-            elif "left" in msg or "west" in msg: act_int = 2
-            elif "right" in msg or "east" in msg: act_int = 3
+            if   "up"    in msg or "north" in msg: act_int = 0
+            elif "down"  in msg or "south" in msg: act_int = 1
+            elif "left"  in msg or "west"  in msg: act_int = 2
+            elif "right" in msg or "east"  in msg: act_int = 3
 
         if act_int == -1:
             reward, done, info = GridEnv.STEP_PENALTY, False, {"result": "invalid_action"}
         else:
             _, reward, done, info = self._grid.step(act_int)
 
-        rendered_grid = self._grid.render()
-        structured_obs = self._grid.structured_obs()
+        rendered = self._grid.render()
+        structured = self._grid.structured_obs()
+        grid_ui = self._grid.get_grid_for_ui()
 
         return PathosObservation(
-            grid_state=rendered_grid,
-            echoed_message=rendered_grid,
-            structured=structured_obs,
+            grid_state=rendered,
+            echoed_message=rendered,
+            structured=structured,
+            grid_ui=grid_ui,
             message_length=self._grid.steps,
             step_count=self._grid.steps,
+            reward=float(reward),
+            done=done,
             map_type=self._grid.map_type,
             grid_size=self._grid.size,
             episode_seed=self._grid.seed,
+            difficulty_level=self._grid.difficulty_level,
+            difficulty_label=self._grid.difficulty_label,
             keys_collected=self._grid.keys_collected,
-            done=done,
-            reward=float(reward),
-            metadata=self._meta(structured=structured_obs, **info),
+            objectives=dict(self._grid.objectives),
+            trajectory=list(self._grid.trajectory),
+            metadata=self._meta(structured=structured, **info),
         )
 
     @property
@@ -127,11 +128,34 @@ class PathosEnvironment(Environment):
 
     def _meta(self, **extra) -> dict:
         return {
-            "grid_size":    self._grid.size,
-            "agent":        self._grid.agent,
-            "goal":         self._grid.goal,
-            "traps":        self._grid.traps,
-            "step":         self._grid.steps,
-            "episode":      self._episode_count,
+            "grid_size": self._grid.size,
+            "agent":     self._grid.agent,
+            "goal":      self._grid.goal,
+            "traps":     self._grid.traps,
+            "step":      self._grid.steps,
+            "episode":   self._episode_count,
             **extra,
         }
+
+    # ── Extra methods exposed to app.py ───────────────────────────────────
+
+    def get_heatmap(self) -> dict:
+        return {
+            "heatmap": dict(self._grid.visit_heatmap),
+            "size": self._grid.size,
+        }
+
+    def get_replay(self) -> dict:
+        return {
+            "current":  self._grid.trajectory,
+            "best":     self._grid.best_trajectory,
+            "worst":    self._grid.worst_trajectory,
+            "best_score":  self._grid._best_score if self._grid.best_trajectory else None,
+            "worst_score": self._grid._worst_score if self._grid.worst_trajectory else None,
+        }
+
+    def get_layout(self) -> dict:
+        return self._grid.export_layout()
+
+    def load_layout(self, layout: dict):
+        self._grid.reset(advance_difficulty=False, custom_layout=layout)

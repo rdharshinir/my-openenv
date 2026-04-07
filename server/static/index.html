@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Pathos AI – Drone Rescue Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e1a;--bg2:#0f1628;--bg3:#151d35;--bg4:#1a2340;
+  --accent:#00d4ff;--accent2:#7c3aed;--accent3:#10b981;--accent4:#f59e0b;
+  --danger:#ef4444;--fire:#f97316;--wind:#818cf8;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#475569;
+  --border:#1e293b;--border2:#2d3748;
+  --drone:#3b82f6;--extraction:#10b981;--hazard:#ef4444;
+  --survivor:#f59e0b;--wall:#374151;--fog:#1e293b;--windcell:#7c3aed;
+  --glow:0 0 20px rgba(0,212,255,0.3);
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* Top bar */
+.topbar{background:linear-gradient(90deg,var(--bg2),var(--bg3));border-bottom:1px solid var(--border2);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.1rem}
+.logo-icon{font-size:1.5rem;animation:hover-bob 2s ease-in-out infinite}
+@keyframes hover-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.logo span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.badge{padding:3px 10px;border-radius:20px;font-size:0.7rem;font-weight:600;letter-spacing:1px}
+.badge-running{background:rgba(16,185,129,0.2);color:var(--accent3);border:1px solid rgba(16,185,129,0.3)}
+.topbar-right{display:flex;align-items:center;gap:16px}
+.stat-pill{background:var(--bg4);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;font-size:0.75rem;display:flex;align-items:center;gap:6px}
+.stat-pill .val{font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace}
+
+/* Layout */
+.layout{display:grid;grid-template-columns:280px 1fr 300px;gap:0;height:calc(100vh - 57px)}
+
+/* Left panel */
+.left-panel{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+
+/* Center */
+.center{background:var(--bg);overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+
+/* Right panel */
+.right-panel{background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+
+/* Card */
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;transition:border-color 0.2s}
+.card:hover{border-color:var(--border2)}
+.card-title{font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+
+/* Grid container */
+.grid-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+#grid-svg{border-radius:10px;border:2px solid var(--border2);box-shadow:var(--glow);transition:all 0.3s}
+
+/* Controls */
+.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.btn{padding:8px 18px;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;font-size:0.82rem;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;letter-spacing:0.3px}
+.btn:active{transform:scale(0.96)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#0099cc);color:#000}
+.btn-primary:hover{box-shadow:0 0 16px rgba(0,212,255,0.4);transform:translateY(-1px)}
+.btn-danger{background:linear-gradient(135deg,var(--danger),#c0392b);color:#fff}
+.btn-danger:hover{box-shadow:0 0 16px rgba(239,68,68,0.4);transform:translateY(-1px)}
+.btn-success{background:linear-gradient(135deg,var(--accent3),#059669);color:#fff}
+.btn-success:hover{box-shadow:0 0 14px rgba(16,185,129,0.4);transform:translateY(-1px)}
+.btn-ghost{background:var(--bg4);color:var(--text);border:1px solid var(--border2)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-warn{background:linear-gradient(135deg,var(--accent4),#d97706);color:#000}
+
+/* Action buttons */
+.dir-pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:4px;margin:0 auto}
+.dir-btn{border:none;border-radius:8px;background:var(--bg4);color:var(--text);font-size:1rem;cursor:pointer;transition:all 0.15s;border:1px solid var(--border2)}
+.dir-btn:hover{background:var(--accent);color:#000;box-shadow:0 0 12px rgba(0,212,255,0.4);transform:scale(1.08)}
+.dir-btn:active{transform:scale(0.92)}
+.dir-btn.empty{background:transparent;border:none;cursor:default}
+
+/* Difficulty selector */
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.diff-btn{padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg4);cursor:pointer;transition:all 0.2s;text-align:center;font-size:0.75rem;font-weight:600;color:var(--text2)}
+.diff-btn:hover,.diff-btn.active{border-color:var(--accent);background:rgba(0,212,255,0.1);color:var(--accent)}
+.diff-btn .lbl{font-size:1rem;display:block;margin-bottom:2px}
+
+/* Reward / info display */
+.reward-display{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;text-align:center;color:var(--accent);text-shadow:0 0 20px rgba(0,212,255,0.5)}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.78rem}
+.info-row:last-child{border:none}
+.info-val{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent)}
+.msg-box{background:var(--bg4);border:1px solid var(--border2);border-radius:8px;padding:10px;font-size:0.8rem;color:var(--text2);min-height:40px;line-height:1.5;font-family:'JetBrains Mono',monospace}
+
+/* Objectives */
+.obj-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.78rem}
+.obj-icon{font-size:1rem}
+.obj-check{margin-left:auto;width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:0.65rem}
+.obj-check.done{background:var(--accent3);border-color:var(--accent3);color:#fff}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:0.7rem;color:var(--text2)}
+.legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+
+/* Chart */
+.chart-wrap{position:relative;height:150px}
+
+/* Heatmap */
+#heatmap-canvas{border-radius:8px;width:100%;display:block}
+
+/* Leaderboard */
+.lb-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;font-size:0.75rem;transition:background 0.2s}
+.lb-row:hover{background:var(--bg4)}
+.lb-rank{width:22px;height:22px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.7rem;flex-shrink:0}
+.lb-rank.gold{background:linear-gradient(135deg,#f59e0b,#d97706);color:#000}
+.lb-rank.silver{background:linear-gradient(135deg,#94a3b8,#64748b);color:#fff}
+.lb-rank.bronze{background:linear-gradient(135deg,#b45309,#92400e);color:#fff}
+.lb-agent{flex:1;font-weight:500}
+.lb-score{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent3);font-size:0.8rem}
+.lb-diff{font-size:0.65rem;color:var(--text3)}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:12px}
+.tab{padding:5px 12px;border-radius:6px;font-size:0.72rem;font-weight:600;cursor:pointer;background:var(--bg4);color:var(--text2);border:1px solid var(--border);transition:all 0.2s}
+.tab.active{background:rgba(0,212,255,0.15);color:var(--accent);border-color:rgba(0,212,255,0.4)}
+
+/* Scenario editor */
+.scenario-info{font-size:0.72rem;color:var(--text2);line-height:1.6}
+textarea.seed-input{width:100%;background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:0.7rem;resize:vertical;min-height:80px}
+textarea.seed-input:focus{outline:none;border-color:var(--accent)}
+select.styled{width:100%;background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:8px;font-family:'Inter',sans-serif;font-size:0.8rem;cursor:pointer}
+select.styled:focus{outline:none;border-color:var(--accent)}
+
+/* Input */
+.msg-input{width:100%;background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:8px 12px;font-family:'Inter',sans-serif;font-size:0.82rem}
+.msg-input:focus{outline:none;border-color:var(--accent)}
+
+/* Replay strip */
+.replay-step{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:var(--bg4);border-radius:6px;font-size:0.7rem;font-family:'JetBrains Mono',monospace;border:1px solid var(--border)}
+.replay-strip{display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow-y:auto}
+
+/* Success / fail overlay */
+.episode-end{text-align:center;padding:12px;border-radius:10px;font-weight:700;font-size:1rem;margin:4px 0}
+.episode-end.success{background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);color:var(--accent3)}
+.episode-end.fail{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:var(--danger)}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* Animations */
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 8px rgba(0,212,255,0.2)}50%{box-shadow:0 0 24px rgba(0,212,255,0.6)}}
+.pulse{animation:pulse-glow 1.5s ease-in-out infinite}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.3s ease}
+
+/* Wind indicator */
+.wind-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);color:var(--wind);font-size:0.68rem;font-weight:600}
+
+/* drone move animation target */
+.drone-cell{transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">
+    <span class="logo-icon">🚁</span>
+    <span>Pathos AI</span>
+    <span class="badge badge-running">LIVE</span>
+  </div>
+  <div class="topbar-right">
+    <div class="stat-pill">Episode <span class="val" id="ep-num">0</span></div>
+    <div class="stat-pill">Steps <span class="val" id="top-steps">0</span></div>
+    <div class="stat-pill">Reward <span class="val" id="top-reward">0.00</span></div>
+    <div class="stat-pill">Success <span class="val" id="top-success">0%</span></div>
+  </div>
+</div>
+
+<div class="layout">
+<!-- ═══ LEFT PANEL ═══ -->
+<div class="left-panel">
+
+  <!-- Difficulty -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Difficulty Level</div>
+    <div class="diff-grid">
+      <button class="diff-btn active" onclick="setDifficulty(1)"><span class="lbl">🟢</span>Rookie<br/><span style="opacity:.6;font-size:.65rem">5×5 Open</span></button>
+      <button class="diff-btn" onclick="setDifficulty(2)"><span class="lbl">🔵</span>Trained<br/><span style="opacity:.6;font-size:.65rem">7×7 Sparse</span></button>
+      <button class="diff-btn" onclick="setDifficulty(3)"><span class="lbl">🟠</span>Expert<br/><span style="opacity:.6;font-size:.65rem">10×10 Fog</span></button>
+      <button class="diff-btn" onclick="setDifficulty(4)"><span class="lbl">🔴</span>Legendary<br/><span style="opacity:.6;font-size:.65rem">10×10 Wind</span></button>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Controls</div>
+    <div class="dir-pad">
+      <button class="dir-btn empty"></button>
+      <button class="dir-btn" onclick="sendAction('up')" title="Up (W)">↑</button>
+      <button class="dir-btn empty"></button>
+      <button class="dir-btn" onclick="sendAction('left')" title="Left (A)">←</button>
+      <button class="dir-btn empty" style="background:var(--bg3);border:1px solid var(--border)">🚁</button>
+      <button class="dir-btn" onclick="sendAction('right')" title="Right (D)">→</button>
+      <button class="dir-btn empty"></button>
+      <button class="dir-btn" onclick="sendAction('down')" title="Down (S)">↓</button>
+      <button class="dir-btn empty"></button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-ghost" style="flex:1" onclick="resetEp()">🔄 Reset</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="getState()">📡 State</button>
+    </div>
+    <div style="margin-top:8px">
+      <input class="msg-input" id="msg-input" placeholder="Type action (e.g. go north)…" onkeydown="if(event.key==='Enter')sendText()"/>
+    </div>
+  </div>
+
+  <!-- Episode info -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Episode Stats</div>
+    <div class="reward-display" id="reward-display">0.00</div>
+    <div style="margin:8px 0 4px;font-size:.7rem;color:var(--text2);text-align:center">Total Reward</div>
+    <div class="info-row"><span>Steps</span><span class="info-val" id="step-count">0</span></div>
+    <div class="info-row"><span>Distance to Zone</span><span class="info-val" id="dist-val">—</span></div>
+    <div class="info-row"><span>Survivors Rescued</span><span class="info-val" id="survivors-val">0</span></div>
+    <div class="info-row"><span>Map Type</span><span class="info-val" id="map-type-val">open</span></div>
+    <div class="info-row"><span>Done</span><span class="info-val" id="done-val">False</span></div>
+  </div>
+
+  <!-- Message -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Last Message</div>
+    <div class="msg-box" id="msg-box">Awaiting first action…</div>
+  </div>
+
+  <!-- Objectives -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Objectives</div>
+    <div class="obj-row"><span class="obj-icon">🏥</span><span>Reach Extraction (+10)</span><div class="obj-check" id="obj-extraction"></div></div>
+    <div class="obj-row"><span class="obj-icon">🆘</span><span>Rescue Survivors (+0.3)</span><div class="obj-check" id="obj-survivors"></div></div>
+    <div class="obj-row"><span class="obj-icon">⚡</span><span>Speed Bonus ≤10 steps (+0.5)</span><div class="obj-check" id="obj-speed"></div></div>
+  </div>
+
+</div>
+
+<!-- ═══ CENTER ═══ -->
+<div class="center">
+
+  <!-- Grid -->
+  <div class="card grid-wrap">
+    <div class="card-title"><span class="dot"></span>Live Grid — <span id="grid-label" style="color:var(--accent)">5×5 Rookie</span></div>
+    <svg id="grid-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="wind-indicator" style="display:none" class="wind-badge">🌪️ Wind Zone Active</div>
+    <div id="episode-end-banner" style="display:none"></div>
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Drone</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Extraction</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Hazard</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>Fire</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Survivor</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div>Wind</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#374151"></div>Wall</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1e293b"></div>Fog</div>
+    </div>
+  </div>
+
+  <!-- Scenario Editor -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Scenario Editor</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn btn-ghost" onclick="exportLayout()">💾 Save Map</button>
+      <button class="btn btn-ghost" onclick="loadLayoutFromInput()">📂 Load Map</button>
+      <button class="btn btn-warn" onclick="randomMap()">🎲 Random Map</button>
+      <select class="styled" id="size-select" style="flex:1;min-width:100px">
+        <option value="5">5×5 Grid</option>
+        <option value="7">7×7 Grid</option>
+        <option value="10">10×10 Grid</option>
+      </select>
+    </div>
+    <textarea class="seed-input" id="seed-input" placeholder='Paste JSON seed here to load a map, or click "Save Map" to export…'></textarea>
+    <div class="scenario-info" style="margin-top:6px">💡 Click grid cells while holding <kbd style="background:var(--bg4);padding:1px 5px;border-radius:4px;border:1px solid var(--border2)">Shift</kbd> to toggle hazards in editor mode</div>
+  </div>
+
+  <!-- Replay -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Episode Replay</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="startReplay('current')">▶ Replay Current</button>
+      <button class="btn btn-ghost" onclick="startReplay('best')">🏆 Best Episode</button>
+      <button class="btn btn-ghost" onclick="startReplay('worst')">💀 Worst Episode</button>
+      <button class="btn btn-success" onclick="exportGIF()">🎞 Export GIF</button>
+    </div>
+    <div id="replay-status" style="font-size:.75rem;color:var(--text2);margin-bottom:6px">No replay active</div>
+    <div class="replay-strip" id="replay-strip"></div>
+  </div>
+
+</div>
+
+<!-- ═══ RIGHT PANEL ═══ -->
+<div class="right-panel">
+
+  <!-- Reward Curve -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Reward Curve (last 50 ep)</div>
+    <div class="chart-wrap"><canvas id="reward-chart"></canvas></div>
+  </div>
+
+  <!-- Success Rate -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Success Rate</div>
+    <div class="chart-wrap" style="height:110px"><canvas id="success-chart"></canvas></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Visit Heatmap</div>
+    <canvas id="heatmap-canvas" height="200"></canvas>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>Leaderboard</div>
+    <div id="lb-agent-name" style="margin-bottom:8px;display:flex;gap:6px">
+      <input class="msg-input" id="lb-name-input" placeholder="Your agent name…" style="flex:1"/>
+      <button class="btn btn-success" onclick="submitScore()">Submit</button>
+    </div>
+    <div id="leaderboard-list"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let BASE = '';
+let episodeId = null;
+let totalReward = 0;
+let stepCount = 0;
+let isDone = false;
+let currentDifficulty = 1;
+let episodeCount = 0;
+let successCount = 0;
+let episodeLog = [];      // [{total_reward, steps, success}]
+let lastGridData = null;
+let lastObservation = null;
+
+// Replay
+let replayData = {current:[], best:[], worst:[]};
+let replayTimer = null;
+let replayIdx = 0;
+let replayMode = null;
+
+// Charts
+let rewardChart, successChart;
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('load', async () => {
+  initCharts();
+  await resetEp();
+  loadLeaderboard();
+  setInterval(loadLeaderboard, 15000);
+  setInterval(loadEpStats, 8000);
+});
+
+// Keyboard
+window.addEventListener('keydown', e => {
+  if (document.activeElement.tagName === 'TEXTAREA' ||
+      document.activeElement.tagName === 'INPUT') return;
+  const map = {w:'up', s:'down', a:'left', d:'right',
+               ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'};
+  if (map[e.key]) { e.preventDefault(); sendAction(map[e.key]); }
+});
+
+// ═══════════════════════════════════════════════════════════
+// API HELPERS
+// ═══════════════════════════════════════════════════════════
+async function api(method, path, body) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(BASE + path, opts);
+  return r.json();
+}
+
+// ═══════════════════════════════════════════════════════════
+// EPISODE MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+async function resetEp() {
+  if (isDone && episodeId) {
+    episodeLog.push({ total_reward: totalReward, steps: stepCount, success: lastObservation?.objectives?.reached_extraction || false });
+    await fetch('/log_episode', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      total_reward: totalReward, steps: stepCount,
+      success: lastObservation?.objectives?.reached_extraction || false,
+      difficulty: getDiffLabel(currentDifficulty)
+    })});
+  }
+
+  totalReward = 0; stepCount = 0; isDone = false;
+  document.getElementById('episode-end-banner').style.display = 'none';
+  document.getElementById('wind-indicator').style.display = 'none';
+
+  const res = await api('POST', '/reset', {
+    seed: null,
+    difficulty: currentDifficulty
+  });
+
+  episodeId = res.episode_id || res.metadata?.episode_id || null;
+  episodeCount++;
+  document.getElementById('ep-num').textContent = episodeCount;
+  if (successCount + episodeCount > 0)
+    document.getElementById('top-success').textContent =
+      Math.round(successCount / episodeCount * 100) + '%';
+
+  handleObs(res);
+  updateCharts();
+}
+
+async function sendAction(dir) {
+  if (isDone) { await resetEp(); return; }
+  const res = await api('POST', '/step', { message: dir });
+  totalReward = (lastObservation?.objectives?.total_score ?? 0);
+  handleObs(res);
+}
+
+async function sendText() {
+  const v = document.getElementById('msg-input').value.trim();
+  if (!v) return;
+  await sendAction(v);
+  document.getElementById('msg-input').value = '';
+}
+
+async function getState() {
+  const res = await api('GET', '/state');
+  handleObs(res);
+}
+
+// ═══════════════════════════════════════════════════════════
+// OBSERVATION HANDLER
+// ═══════════════════════════════════════════════════════════
+function handleObs(obs) {
+  lastObservation = obs;
+  const s = obs.structured || {};
+  const obj = obs.objectives || s.objectives || {};
+
+  // Top bar
+  const tr = obj.total_score ?? obs.reward ?? 0;
+  stepCount = obs.step_count || s.battery_used || 0;
+  document.getElementById('top-steps').textContent = stepCount;
+  document.getElementById('top-reward').textContent = (tr >= 0 ? '+' : '') + tr.toFixed(2);
+  document.getElementById('reward-display').textContent = (tr >= 0 ? '+' : '') + tr.toFixed(2);
+  document.getElementById('reward-display').style.color = tr >= 0 ? 'var(--accent3)' : 'var(--danger)';
+
+  // Stats
+  document.getElementById('step-count').textContent = stepCount;
+  document.getElementById('dist-val').textContent = s.manhattan_dist_to_extraction ?? '—';
+  document.getElementById('survivors-val').textContent = `${s.survivors_rescued ?? 0} / ${(s.survivors_to_rescue?.length ?? 0) + (s.survivors_rescued ?? 0)}`;
+  document.getElementById('map-type-val').textContent = obs.map_type || s.disaster_type || '—';
+  document.getElementById('done-val').textContent = String(obs.done);
+  document.getElementById('grid-label').textContent =
+    `${obs.grid_size || s.zone_size || 5}×${obs.grid_size || s.zone_size || 5} ${obs.difficulty_label || s.difficulty_label || ''}`;
+
+  // Message
+  const dir = s.direction_to_extraction;
+  const danger = s.nearby_danger ? '⚠️ DANGER NEARBY' : '✅ Clear';
+  document.getElementById('msg-box').textContent =
+    `Direction: ${dir || '?'} | ${danger}\n${obs.grid_state?.split('\n').slice(-1)[0] || ''}`;
+
+  // Objectives
+  setObj('obj-extraction', obj.reached_extraction);
+  setObj('obj-survivors', obj.survivors_rescued > 0);
+  setObj('obj-speed', obj.speed_bonus);
+
+  // Wind indicator
+  if (s.wind_zones?.length > 0 && obs.metadata?.wind_applied) {
+    document.getElementById('wind-indicator').style.display = 'inline-flex';
+    setTimeout(() => document.getElementById('wind-indicator').style.display = 'none', 2000);
+  }
+
+  // Draw grid
+  if (obs.grid_ui) drawGrid(obs.grid_ui);
+  else if (s.drone_position) drawGridFromStructured(s, obs.grid_size || 5);
+
+  // Update replay data
+  if (obs.trajectory) replayData.current = obs.trajectory;
+
+  // Done overlay
+  if (obs.done) {
+    isDone = true;
+    if (obj.reached_extraction) successCount++;
+    showEndBanner(obj.reached_extraction, tr, stepCount, obj.speed_bonus);
+    loadEpStats();
+    updateHeatmap(s);
+  } else {
+    updateHeatmap(s);
+  }
+}
+
+function setObj(id, done) {
+  const el = document.getElementById(id);
+  el.className = 'obj-check' + (done ? ' done' : '');
+  el.textContent = done ? '✓' : '';
+}
+
+function showEndBanner(success, reward, steps, speed) {
+  const el = document.getElementById('episode-end-banner');
+  el.style.display = 'block';
+  el.className = 'episode-end fade-in ' + (success ? 'success' : 'fail');
+  el.innerHTML = success
+    ? `✅ Extraction Complete! Reward: <b>${reward.toFixed(2)}</b> in ${steps} steps${speed ? ' ⚡ Speed Bonus!' : ''}<br/><small>Press any arrow or WASD to start next episode</small>`
+    : `💥 Mission Failed! Reward: <b>${reward.toFixed(2)}</b><br/><small>Press any arrow or WASD to try again</small>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SVG GRID RENDERER
+// ═══════════════════════════════════════════════════════════
+const CELL_COLORS = {
+  drone:      '#3b82f6',
+  extraction: '#10b981',
+  hazard:     '#ef4444',
+  fire:       '#f97316',
+  survivor:   '#f59e0b',
+  wind:       '#7c3aed',
+  wall:       '#374151',
+  fog:        '#1e2533',
+  empty:      '#111827',
+};
+const CELL_EMOJI = {
+  drone:'🚁', extraction:'🏥', hazard:'☣️', fire:'🔥',
+  survivor:'🆘', wind:'🌪️', wall:'🧱', fog:'🌫️', empty:''
+};
+
+function drawGrid(gridData) {
+  lastGridData = gridData;
+  const svg = document.getElementById('grid-svg');
+  const N = gridData.size || 10;
+  const maxW = Math.min(window.innerWidth * 0.4, 480);
+  const cell = Math.max(28, Math.floor(maxW / N));
+  const W = cell * N;
+
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', W);
+  svg.setAttribute('viewBox', `0 0 ${W} ${W}`);
+
+  let html = '';
+  for (const c of gridData.cells) {
+    const x = c.c * cell, y = c.r * cell;
+    const color = CELL_COLORS[c.type] || CELL_COLORS.empty;
+    const emoji = CELL_EMOJI[c.type] || '';
+    const glowFilter = c.type === 'drone' ? 'filter:url(#glow)' : '';
+    const rx = c.type === 'drone' ? 6 : 3;
+    html += `<rect x="${x+1}" y="${y+1}" width="${cell-2}" height="${cell-2}" rx="${rx}"
+      fill="${color}" opacity="${c.type==='fog'?0.5:0.9}" style="transition:fill 0.3s"/>`;
+    if (emoji && cell >= 32) {
+      const fs = Math.max(12, cell * 0.5);
+      html += `<text x="${x+cell/2}" y="${y+cell/2+fs*0.35}" text-anchor="middle"
+        font-size="${fs}" style="user-select:none">${emoji}</text>`;
+    }
+    // Coordinate on hover (title)
+    html += `<title>(${c.r},${c.c}) ${c.type}</title>`;
+  }
+
+  svg.innerHTML = `<defs>
+    <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="${W}" height="${W}" fill="#0a0e1a" rx="8"/>
+  ${html}`;
+
+  // Shift-click to toggle hazards (scenario editor)
+  svg.onclick = (e) => {
+    if (!e.shiftKey) return;
+    const rect = svg.getBoundingClientRect();
+    const c = Math.floor((e.clientX - rect.left) / cell);
+    const r = Math.floor((e.clientY - rect.top) / cell);
+    toggleEditorCell(r, c);
+  };
+}
+
+function drawGridFromStructured(s, N) {
+  const cells = [];
+  const drone = s.drone_position || [0,0];
+  const extr = s.extraction_zone || [N-1,N-1];
+  const hazards = s.static_hazards || [];
+  const fires = s.active_fires || [];
+  const survivors = s.survivors_to_rescue || [];
+  const winds = s.wind_zones || [];
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      let type = 'empty';
+      if (drone[0]===r && drone[1]===c) type='drone';
+      else if (extr[0]===r && extr[1]===c) type='extraction';
+      else if (fires.some(f=>f[0]===r&&f[1]===c)) type='fire';
+      else if (hazards.some(h=>h[0]===r&&h[1]===c)) type='hazard';
+      else if (survivors.some(k=>k[0]===r&&k[1]===c)) type='survivor';
+      else if (winds.some(w=>w[0]===r&&w[1]===c)) type='wind';
+      cells.push({r,c,type});
+    }
+  }
+  drawGrid({cells, size: N});
+}
+
+// ═══════════════════════════════════════════════════════════
+// HEATMAP
+// ═══════════════════════════════════════════════════════════
+let heatmapData = {};
+let heatmapSize = 5;
+
+function updateHeatmap(s) {
+  const pos = s.drone_position || [0,0];
+  const key = `${pos[0]},${pos[1]}`;
+  heatmapData[key] = (heatmapData[key] || 0) + 1;
+  heatmapSize = s.zone_size || 5;
+  renderHeatmap();
+}
+
+function renderHeatmap() {
+  const canvas = document.getElementById('heatmap-canvas');
+  const ctx = canvas.getContext('2d');
+  const N = heatmapSize;
+  const cW = canvas.parentElement.clientWidth - 28;
+  const cell = Math.floor(cW / N);
+  canvas.width = cell * N;
+  canvas.height = cell * N;
+
+  const max = Math.max(1, ...Object.values(heatmapData));
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const v = (heatmapData[`${r},${c}`] || 0) / max;
+      ctx.fillStyle = `hsla(${200 - v*160}, 80%, ${20 + v*50}%, ${0.3 + v*0.7})`;
+      ctx.fillRect(c*cell+1, r*cell+1, cell-2, cell-2);
+      if (v > 0 && cell >= 24) {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = `bold ${Math.max(8, cell*0.35)}px JetBrains Mono`;
+        ctx.textAlign = 'center';
+        ctx.fillText(heatmapData[`${r},${c}`] || '', c*cell+cell/2, r*cell+cell/2+4);
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════
+function initCharts() {
+  const chartOpts = {
+    responsive: true, maintainAspectRatio: false, animation: {duration: 400},
+    plugins: {legend:{display:false}},
+    scales: {
+      x: {display:false, grid:{color:'rgba(255,255,255,0.03)'}},
+      y: {grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b',font:{size:9}}}
+    }
+  };
+
+  rewardChart = new Chart(document.getElementById('reward-chart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [], borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.08)',
+        tension: 0.4, pointRadius: 2, borderWidth: 2, fill: true
+      }]
+    },
+    options: {...chartOpts}
+  });
+
+  successChart = new Chart(document.getElementById('success-chart'), {
+    type: 'bar',
+    data: {
+      labels: ['Success', 'Fail'],
+      datasets: [{
+        data: [0, 100],
+        backgroundColor: ['rgba(16,185,129,0.7)', 'rgba(239,68,68,0.4)'],
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: {duration:400},
+      plugins: {legend:{display:false}},
+      scales: {x:{ticks:{color:'#64748b',font:{size:10}}}, y:{display:false, max:100}}
+    }
+  });
+}
+
+function updateCharts() {
+  const total = episodeCount;
+  const succ = successCount;
+  const fail = total - succ;
+  successChart.data.datasets[0].data = [
+    total > 0 ? Math.round(succ/total*100) : 0,
+    total > 0 ? Math.round(fail/total*100) : 100
+  ];
+  successChart.update();
+}
+
+async function loadEpStats() {
+  try {
+    const res = await fetch('/episode_stats');
+    const data = await res.json();
+    const eps = data.episodes || [];
+    rewardChart.data.labels = eps.map((_,i) => i+1);
+    rewardChart.data.datasets[0].data = eps.map(e => e.total_reward || 0);
+    rewardChart.update();
+
+    if (eps.length > 0) {
+      const successes = eps.filter(e => e.success).length;
+      document.getElementById('top-success').textContent =
+        Math.round(successes / eps.length * 100) + '%';
+    }
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// DIFFICULTY
+// ═══════════════════════════════════════════════════════════
+function setDifficulty(level) {
+  currentDifficulty = level;
+  document.querySelectorAll('.diff-btn').forEach((b,i) => {
+    b.classList.toggle('active', i === level-1);
+  });
+  resetEp();
+}
+
+function getDiffLabel(l) {
+  return {1:'Rookie',2:'Trained',3:'Expert',4:'Legendary'}[l] || 'Custom';
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEADERBOARD
+// ═══════════════════════════════════════════════════════════
+async function loadLeaderboard() {
+  try {
+    const res = await fetch('/leaderboard');
+    const data = await res.json();
+    const lb = data.leaderboard || [];
+    const el = document.getElementById('leaderboard-list');
+    const rankCls = ['gold','silver','bronze'];
+    el.innerHTML = lb.map(e => `
+      <div class="lb-row">
+        <div class="lb-rank ${rankCls[e.rank-1]||''}">${e.rank}</div>
+        <div class="lb-agent">
+          ${e.agent_name}<br/>
+          <span class="lb-diff">${e.difficulty || ''} · ${e.episodes} ep</span>
+        </div>
+        <div class="lb-score">${(e.score*100).toFixed(0)}%</div>
+        <div style="font-size:.75rem;color:${e.success?'var(--accent3)':'var(--danger)'}">${e.success?'✓':'✗'}</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function submitScore() {
+  const name = document.getElementById('lb-name-input').value.trim() || 'Anonymous';
+  const lastObs = lastObservation;
+  const obj = lastObs?.objectives || {};
+  const score = obj.reached_extraction
+    ? Math.max(0.5, 1.0 - (stepCount - 1) / Math.max(20, stepCount))
+    : 0.1 * Math.max(0, 1 - (lastObs?.structured?.manhattan_dist_to_extraction || 5) / 10);
+
+  await fetch('/submit_score', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      agent_name: name, score, episodes: episodeCount,
+      avg_steps: stepCount, success: obj.reached_extraction || false,
+      difficulty: getDiffLabel(currentDifficulty)
+    })
+  });
+  loadLeaderboard();
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCENARIO EDITOR
+// ═══════════════════════════════════════════════════════════
+async function exportLayout() {
+  if (!episodeId) { alert('Start an episode first'); return; }
+  try {
+    const res = await fetch(`/export_layout/${episodeId}`);
+    const data = await res.json();
+    document.getElementById('seed-input').value = JSON.stringify(data, null, 2);
+  } catch(e) {
+    // Fallback: use structured obs
+    const s = lastObservation?.structured || {};
+    const layout = {
+      size: s.zone_size || 5,
+      map_type: s.disaster_type || 'open',
+      agent: s.drone_position || [0,0],
+      goal: s.extraction_zone || [4,4],
+      traps: s.static_hazards || [],
+      moving_traps: s.active_fires || [],
+      wind_zones: s.wind_zones || [],
+      keys: s.survivors_to_rescue || [],
+      walls: []
+    };
+    document.getElementById('seed-input').value = JSON.stringify(layout, null, 2);
+  }
+}
+
+async function loadLayoutFromInput() {
+  const raw = document.getElementById('seed-input').value.trim();
+  if (!raw) { alert('Paste a JSON seed first'); return; }
+  let layout;
+  try { layout = JSON.parse(raw); } catch(e) { alert('Invalid JSON'); return; }
+  if (!episodeId) { alert('Start an episode first'); return; }
+  try {
+    const res = await fetch(`/load_layout/${episodeId}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(layout)
+    });
+    const data = await res.json();
+    if (data.error) alert(data.error);
+    else await getState();
+  } catch(e) {
+    alert('Load layout failed: ' + e.message);
+  }
+}
+
+async function randomMap() {
+  const sizes = [5,7,10];
+  const types = ['open','sparse','maze','adversarial'];
+  const N = sizes[Math.floor(Math.random()*sizes.length)];
+  document.getElementById('size-select').value = N;
+  setDifficulty(Math.ceil(Math.random()*4));
+}
+
+function toggleEditorCell(r, c) {
+  if (!lastGridData) return;
+  const cell = lastGridData.cells.find(x => x.r===r && x.c===c);
+  if (!cell || cell.type==='drone' || cell.type==='extraction') return;
+  cell.type = cell.type==='hazard' ? 'empty' : 'hazard';
+  drawGrid(lastGridData);
+}
+
+// ═══════════════════════════════════════════════════════════
+// REPLAY
+// ═══════════════════════════════════════════════════════════
+async function fetchReplay() {
+  if (!episodeId) return;
+  try {
+    const res = await fetch(`/replay/${episodeId}`);
+    const data = await res.json();
+    replayData = data;
+  } catch(e) {}
+}
+
+async function startReplay(mode) {
+  await fetchReplay();
+  clearInterval(replayTimer);
+  const traj = replayData[mode] || [];
+  if (!traj.length) {
+    document.getElementById('replay-status').textContent = `No ${mode} trajectory recorded yet`;
+    return;
+  }
+  replayMode = mode;
+  replayIdx = 0;
+  const strip = document.getElementById('replay-strip');
+  strip.innerHTML = '';
+  document.getElementById('replay-status').textContent =
+    `Replaying ${mode} episode (${traj.length} steps)…`;
+
+  replayTimer = setInterval(() => {
+    if (replayIdx >= traj.length) {
+      clearInterval(replayTimer);
+      document.getElementById('replay-status').textContent =
+        `Replay complete — ${traj.length} steps`;
+      return;
+    }
+    const step = traj[replayIdx];
+    const icons = {up:'↑', down:'↓', left:'←', right:'→'};
+    const color = step.reward > 0 ? 'var(--accent3)' : step.reward < -1 ? 'var(--danger)' : 'var(--text2)';
+    strip.innerHTML += `<span class="replay-step" style="border-color:${color}">
+      ${step.step} ${icons[step.action_label]||'?'} <span style="color:${color}">${step.reward.toFixed(1)}</span>
+    </span>`;
+    strip.scrollLeft = strip.scrollWidth;
+    replayIdx++;
+  }, 400);
+}
+
+async function exportGIF() {
+  alert('GIF export requires a canvas-based GIF encoder library (e.g. gif.js). Feature coming soon! Export the trajectory JSON from Replay instead.');
+}
+</script>
+</body>
+</html>
